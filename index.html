@@ -23,7 +23,7 @@
             storageBucket: "ai-insight-analyze.firebasestorage.app",
             messagingSenderId: "455704245067",
             appId: "1:455704245067:web:a3370df0e73d2be7b8eece",
-	measurementId: "G-GYKVTZ3VKT"
+            measurementId: "G-GYKVTZ3VKT"
         };
 
         // Firebase 초기화
@@ -226,13 +226,15 @@
                 if (!docSnap.exists()) throw new Error("문서를 찾을 수 없습니다.");
                 const item = docSnap.data();
 
+                // 💡 프롬프트 수정: 중첩 객체 반환을 금지하고 단일 문자열로 요구하도록 강화
                 const prompt = `너는 PM이야. 대학생이 1달 안에 구현할 수 있도록 상세 기획을 작성해줘.
                 제목: ${item.title}
                 내용: ${item.idea || item.context}
                 기술스택: ${item.techStack}
                 
                 반드시 JSON 형식으로 응답:
-                { "architecture": "...", "coreFeatures": "...", "milestone": "...", "tips": "..." }`;
+                { "architecture": "...", "coreFeatures": "...", "milestone": "...", "tips": "..." }
+                ⚠️ 중요: JSON의 각 항목(architecture 등)의 값은 하위 객체나 배열로 쪼개지 말고, 반드시 '하나의 매끄러운 텍스트 문자열(String)'로만 작성해. 줄바꿈은 \\n 을 사용해.`;
 
                 const aiRes = await fetch('https://api.openai.com/v1/chat/completions', {
                     method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
@@ -244,10 +246,29 @@
 
                 const detail = JSON.parse(aiData.choices[0].message.content);
 
+                // 💡 포맷터 업그레이드: 만약 AI가 실수로 배열/객체를 보내도 예쁘게 변환하도록 방어 코드 추가
                 const formatText = (data) => {
                     if (!data) return "내용 없음";
-                    if (Array.isArray(data)) return data.join('<br><br>');
-                    if (typeof data === 'object') return JSON.stringify(data);
+                    if (typeof data === 'string') return data.replace(/\n/g, '<br>');
+                    
+                    // AI가 배열 형태로 데이터를 줬을 때 
+                    if (Array.isArray(data)) {
+                        return data.map(item => {
+                            if (typeof item === 'object') {
+                                return Object.entries(item).map(([k, v]) => `• <b>${k}</b>: ${v}`).join('<br>');
+                            }
+                            return `• ${item}`;
+                        }).join('<br><br>');
+                    }
+                    
+                    // AI가 또 JSON 객체 형태로 쪼개서 줬을 때
+                    if (typeof data === 'object') {
+                        return Object.entries(data).map(([k, v]) => {
+                            const valStr = typeof v === 'object' ? JSON.stringify(v) : v;
+                            return `• <b>${k}</b>: ${valStr}`;
+                        }).join('<br><br>');
+                    }
+                    
                     return String(data).replace(/\n/g, '<br>');
                 };
 
