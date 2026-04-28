@@ -8,14 +8,13 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     
-    <!-- 💡 [추가됨] 파이어베이스 라이브러리 연동 (v10 모듈 방식) -->
+    <!-- 파이어베이스 라이브러리 연동 (v10 모듈 방식) -->
     <script type="module">
-        // Firebase 모듈 가져오기
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
         import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
         import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc, query, orderBy, where } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
 
-        // 🚨 여기에 파이어베이스 설정 코드를 붙여넣으세요! 🚨
+        // 파이어베이스 설정 코드
         const firebaseConfig = {
             apiKey: "AIzaSyD9qnzIiBbfryyWtteCHCxvwrOdPo6L7ho",
             authDomain: "ai-insight-analyze.firebaseapp.com",
@@ -26,18 +25,15 @@
             measurementId: "G-GYKVTZ3VKT"
         };
 
-        // Firebase 초기화
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
         const provider = new GoogleAuthProvider();
 
-        // 전역에서 사용할 수 있게 window 객체에 할당 (기존 로직과 호환을 위함)
         window.firebaseDB = db;
         window.firebaseAuth = auth;
-        window.currentUser = null; // 현재 로그인한 사용자 정보
+        window.currentUser = null; 
 
-        // 로그인 상태 감지
         onAuthStateChanged(auth, (user) => {
             const loginBtn = document.getElementById('btn-login');
             const logoutBtn = document.getElementById('btn-logout');
@@ -45,39 +41,33 @@
             const vaultWarning = document.getElementById('vault-warning');
 
             if (user) {
-                // 로그인 됨
                 window.currentUser = user;
                 loginBtn.style.display = 'none';
                 logoutBtn.style.display = 'block';
                 userInfo.innerText = `👋 환영합니다, ${user.displayName}님!`;
                 vaultWarning.style.display = 'none';
                 
-                // 로그인 성공 시 서버에서 데이터 불러오기
                 if(document.getElementById('vault').classList.contains('active')) {
                     renderVaultFromCloud();
                 }
             } else {
-                // 로그아웃 됨
                 window.currentUser = null;
                 loginBtn.style.display = 'block';
                 logoutBtn.style.display = 'none';
                 userInfo.innerText = `로그인하여 데이터를 클라우드에 보관하세요.`;
                 vaultWarning.style.display = 'block';
-                document.getElementById('vault-list').innerHTML = ''; // 화면 비우기
+                document.getElementById('vault-list').innerHTML = ''; 
             }
         });
 
-        // 구글 로그인 함수 (HTML 버튼에 바인딩용)
         window.loginWithGoogle = () => {
             signInWithPopup(auth, provider).catch(error => alert("로그인 실패: " + error.message));
         };
 
-        // 로그아웃 함수
         window.logoutFirebase = () => {
             signOut(auth).then(() => { alert("로그아웃 되었습니다."); });
         };
 
-        // 💡 [클라우드 저장 로직] - Firestore에 데이터 추가
         window.saveToCloud = async (type, index, isAuto = false) => {
             if(!window.currentUser) {
                 if(!isAuto) alert("저장소 기능을 사용하려면 먼저 로그인해주세요!");
@@ -87,7 +77,6 @@
             let itemToSave = type === 'biz' ? currentInsights[index] : currentFeasibilities[index];
             const ideasRef = collection(db, "ideas");
 
-            // 중복 체크 로직 (서버에 이미 같은 제목이 있는지 확인)
             const q = query(ideasRef, where("uid", "==", window.currentUser.uid), where("title", "==", itemToSave.title));
             const querySnapshot = await getDocs(q);
             
@@ -97,9 +86,8 @@
             }
 
             try {
-                // 저장할 데이터 객체 구성
                 const dataToSave = {
-                    uid: window.currentUser.uid, // 누구의 데이터인지 식별
+                    uid: window.currentUser.uid, 
                     type: type,
                     title: itemToSave.title || "",
                     context: itemToSave.context || "",
@@ -109,13 +97,12 @@
                     costEvaluation: itemToSave.costEvaluation || "",
                     techStack: itemToSave.techStack || "",
                     githubLinks: itemToSave.githubLinks || [],
-                    savedAt: new Date().toISOString() // 서버용 시간
+                    savedAt: new Date().toISOString() 
                 };
 
                 await addDoc(ideasRef, dataToSave);
                 if(!isAuto) alert("구글 클라우드에 안전하게 저장되었습니다! ☁️");
                 
-                // 만약 현재 저장소 탭을 보고 있다면 즉시 새로고침
                 if(document.getElementById('vault').classList.contains('active')) {
                     renderVaultFromCloud();
                 }
@@ -123,7 +110,6 @@
             } catch (e) { console.error("Error adding document: ", e); }
         };
 
-        // 💡 [클라우드 불러오기 로직] - Firestore에서 데이터 가져와서 화면에 그리기
         window.renderVaultFromCloud = async () => {
             const vaultContainer = document.getElementById('vault-list');
             if(!window.currentUser) {
@@ -146,7 +132,7 @@
                 vaultContainer.innerHTML = '';
                 querySnapshot.forEach((docSnap) => {
                     const item = docSnap.data();
-                    const docId = docSnap.id; // 삭제할 때 필요함
+                    const docId = docSnap.id; 
 
                     let linksHtml = item.githubLinks && item.githubLinks.length > 0 
                         ? item.githubLinks.map(l => `<a href="${l.url}" target="_blank" class="github-link-tag">🔗 ${l.name}</a>`).join(' ') 
@@ -198,20 +184,17 @@
             } catch(e) { console.error("데이터 로드 실패:", e); }
         };
 
-        // 💡 [삭제 로직] - Firestore 문서 삭제
         window.deleteFromCloud = async (docId) => {
             if(!confirm("정말 클라우드에서 이 아이디어를 삭제할까요?")) return;
             try {
                 await deleteDoc(doc(db, "ideas", docId));
-                renderVaultFromCloud(); // 새로고침
+                renderVaultFromCloud(); 
             } catch(e) { alert("삭제 실패: " + e.message); }
         };
 
-        // 💡 상세 기획 생성 로직 (클라우드 데이터 연동)
         window.generateDetailPlanCloud = async (docId) => {
             const apiKey = getApiKey(); if (!apiKey) return;
             
-            // UI를 상세 기획 탭으로 전환 (기존 switchTab과 동일한 로직)
             document.querySelectorAll('.section').forEach(el => el.classList.remove('active'));
             document.querySelectorAll('.menu-btn').forEach(el => el.classList.remove('active'));
             document.getElementById('detail-plan').classList.add('active');
@@ -220,13 +203,11 @@
             container.innerHTML = `<div class="loading" style="color:#3498db;">📡 클라우드에서 데이터를 불러와 상세 기획을 설계 중입니다...</div>`;
 
             try {
-                // 선택한 문서 데이터를 DB에서 다시 한번 정확히 불러옵니다. (안정성)
                 const { getDoc } = await import("https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js");
                 const docSnap = await getDoc(doc(db, "ideas", docId));
                 if (!docSnap.exists()) throw new Error("문서를 찾을 수 없습니다.");
                 const item = docSnap.data();
 
-                // 💡 프롬프트 수정: 중첩 객체 반환을 금지하고 단일 문자열로 요구하도록 강화
                 const prompt = `너는 PM이야. 대학생이 1달 안에 구현할 수 있도록 상세 기획을 작성해줘.
                 제목: ${item.title}
                 내용: ${item.idea || item.context}
@@ -246,12 +227,10 @@
 
                 const detail = JSON.parse(aiData.choices[0].message.content);
 
-                // 💡 포맷터 업그레이드: 만약 AI가 실수로 배열/객체를 보내도 예쁘게 변환하도록 방어 코드 추가
                 const formatText = (data) => {
                     if (!data) return "내용 없음";
                     if (typeof data === 'string') return data.replace(/\n/g, '<br>');
                     
-                    // AI가 배열 형태로 데이터를 줬을 때 
                     if (Array.isArray(data)) {
                         return data.map(item => {
                             if (typeof item === 'object') {
@@ -261,7 +240,6 @@
                         }).join('<br><br>');
                     }
                     
-                    // AI가 또 JSON 객체 형태로 쪼개서 줬을 때
                     if (typeof data === 'object') {
                         return Object.entries(data).map(([k, v]) => {
                             const valStr = typeof v === 'object' ? JSON.stringify(v) : v;
@@ -290,7 +268,7 @@
     </script>
 
     <style>
-        /* (기존 CSS 스타일 - 위에서 중복 생략된 부분입니다) */
+        /* CSS 그대로 유지, 단 드롭다운(select) 박스 스타일만 추가 */
         :root { --bg-color: #f6f8fa; --sidebar-bg: #24292f; --card-bg: #ffffff; --text-main: #24292f; --text-sub: #57606a; --btn-color: #2da44e; --ai-color: #8a2be2; --news-color: #ff6600; --biz-color: #0052cc; --feas-color: #16a085; --save-color: #f1c40f; --border-color: #d0d7de; }
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; margin: 0; display: flex; height: 100vh; background: var(--bg-color); }
         .sidebar { width: 230px; background: var(--sidebar-bg); color: white; display: flex; flex-direction: column; padding-top: 20px; box-shadow: 2px 0 5px rgba(0,0,0,0.1); }
@@ -303,7 +281,10 @@
         .btn-logout:hover { background: #cb2431; }
         .global-api-box { padding: 0 15px 20px 15px; border-bottom: 1px solid rgba(255,255,255,0.1); margin-bottom: 10px; }
         .global-api-box p { margin: 0 0 8px 0; font-size: 0.75em; color: #8b949e; }
-        .global-api-box input { width: 100%; box-sizing: border-box; padding: 10px; border-radius: 6px; border: none; font-size: 13px; outline: none; background: #0d1117; color: #c9d1d9; }
+        
+        /* 💡 [수정됨] select(검색 기간 드롭다운) 디자인을 input(비밀번호 칸)과 동일하게 맞춤 */
+        .global-api-box input, .global-api-box select { width: 100%; box-sizing: border-box; padding: 10px; border-radius: 6px; border: none; font-size: 13px; outline: none; background: #0d1117; color: #c9d1d9; }
+        
         .menu-btn { background: none; border: none; color: #c9d1d9; padding: 15px 20px; text-align: left; font-size: 14px; cursor: pointer; transition: 0.2s; font-weight: bold; }
         .menu-btn:hover { background: rgba(255,255,255,0.1); color: white; }
         .menu-btn.active { background: #0969da; color: white; border-left: 4px solid #58a6ff; }
@@ -342,7 +323,6 @@
     <nav class="sidebar">
         <h2>🚀 GitHub Hub (Daily)</h2>
         
-        <!-- 💡 [추가됨] 구글 로그인 영역 -->
         <div class="auth-box">
             <p id="user-info">로그인하여 데이터를 클라우드에 보관하세요.</p>
             <button id="btn-login" class="btn-auth" onclick="window.loginWithGoogle()">Google 로그인</button>
@@ -351,17 +331,25 @@
 
         <div class="global-api-box">
             <p>🔑 OpenAI API Key</p>
-            <input type="password" id="global-api-key" placeholder="sk-..." oninput="saveApiKey()">
+            <input type="password" id="global-api-key" placeholder="sk-..." oninput="saveApiKey()" style="margin-bottom:15px;">
+            
+            <!-- 💡 [추가됨] 검색 기간 설정 드롭다운 -->
+            <p>📅 트렌드 검색 기간</p>
+            <select id="search-period" onchange="saveSearchPeriod()">
+                <option value="1">최근 1일 (어제)</option>
+                <option value="7">최근 1주일</option>
+                <option value="30">최근 1개월</option>
+            </select>
         </div>
+
         <button class="menu-btn active" id="btn-ainews" onclick="switchTab('ainews')">📰 실시간 IT 뉴스</button>
-        <button class="menu-btn" id="btn-trending" onclick="switchTab('trending')">✨ 오늘의 트렌드 분석</button>
+        <button class="menu-btn" id="btn-trending" onclick="switchTab('trending')">✨ 트렌드 분석</button>
         <button class="menu-btn" id="btn-business" onclick="switchTab('business')">💼 비즈니스 인사이트</button>
         <button class="menu-btn" id="btn-feasibility" onclick="switchTab('feasibility')">🎯 실현 가능성 분석</button>
         <button class="menu-btn" id="btn-vault" onclick="switchTab('vault')">☁️ 클라우드 아이디어 저장소</button>
     </nav>
 
     <main class="main-content">
-        <!-- 기존 내용 유지 -->
         <section id="ainews" class="section theme-news active">
             <h2>📰 실시간 AI/IT 뉴스 브리핑</h2>
             <button class="btn-search btn-news" onclick="fetchNewsWithAI()">📡 지금 이 시간 뉴스 요약</button>
@@ -369,14 +357,14 @@
         </section>
 
         <section id="trending" class="section theme-ai">
-            <h2>🔥 오늘의 글로벌 트렌드 심층 분석</h2>
-            <button class="btn-search btn-ai" onclick="fetchTrendingWithAI()">🚀 오늘 뜬 20개 저장소 분석</button>
+            <h2>🔥 글로벌 트렌드 심층 분석</h2>
+            <button class="btn-search btn-ai" onclick="fetchTrendingWithAI()">🚀 설정된 기간의 20개 저장소 분석</button>
             <div id="trending-list"></div>
         </section>
 
         <section id="business" class="section theme-biz">
-            <h2>💼 일간 데이터 기반 비즈니스 기획</h2>
-            <button class="btn-search btn-biz" onclick="fetchBusinessInsights()">💡 오늘의 기술-뉴스 융합 기획 시작</button>
+            <h2>💼 데이터 기반 비즈니스 기획</h2>
+            <button class="btn-search btn-biz" onclick="fetchBusinessInsights()">💡 설정된 기간의 기술-뉴스 융합 기획 시작</button>
             <div id="biz-list"></div>
         </section>
 
@@ -391,7 +379,6 @@
             <div id="feasibility-result"></div>
         </section>
 
-        <!-- 💡 [수정됨] 클라우드 저장소 탭 -->
         <section id="vault" class="section theme-save">
             <h2>☁️ 클라우드 동기화 아이디어 저장소</h2>
             <p id="vault-warning" style="color:#d73a49; font-weight:bold; text-align:center;">⚠️ 저장소 기능을 사용하려면 왼쪽 메뉴에서 로그인 해주세요.</p>
@@ -406,16 +393,30 @@
     </main>
 
 <script>
-    // 기존 UI 로직 (모듈 스코프 바깥에 존재해야 하므로 따로 빼둠)
     let currentInsights = [];
     let currentFeasibilities = [];
+    let searchPeriod = 1; // 💡 [추가됨] 검색 기간 전역 변수 (기본값 1일)
 
     window.onload = () => {
         const savedKey = localStorage.getItem('openai_api_key');
         if (savedKey) document.getElementById('global-api-key').value = savedKey;
+        
+        // 💡 [추가됨] 저장된 검색 기간 불러오기
+        const savedPeriod = localStorage.getItem('search_period');
+        if (savedPeriod) {
+            searchPeriod = parseInt(savedPeriod);
+            document.getElementById('search-period').value = savedPeriod;
+        }
     };
 
     function saveApiKey() { localStorage.setItem('openai_api_key', document.getElementById('global-api-key').value.trim()); }
+    
+    // 💡 [추가됨] 검색 기간 저장 함수
+    function saveSearchPeriod() { 
+        searchPeriod = parseInt(document.getElementById('search-period').value);
+        localStorage.setItem('search_period', searchPeriod);
+    }
+
     function getApiKey() {
         const key = document.getElementById('global-api-key').value.trim();
         if (!key) { alert("API 키를 먼저 입력해주세요!"); return null; }
@@ -429,15 +430,12 @@
         const activeBtn = document.getElementById('btn-' + tabId);
         if(activeBtn) activeBtn.classList.add('active');
         
-        // 💡 [변경됨] 저장소 탭을 열 때 클라우드에서 데이터를 불러오도록 수정
         if(tabId === 'vault' && window.renderVaultFromCloud) {
             window.renderVaultFromCloud();
         }
     }
 
-    // --- AI API 통신 함수들 ---
     async function fetchNewsWithAI() {
-        // 기존 코드와 완전히 동일 (생략하지 않고 다 적음)
         const apiKey = getApiKey(); if (!apiKey) return;
         const listContainer = document.getElementById('news-list');
         listContainer.innerHTML = '<div class="loading">📡 실시간 해커뉴스 수집 중...</div>';
@@ -471,15 +469,15 @@
     async function fetchTrendingWithAI() {
         const apiKey = getApiKey(); if (!apiKey) return;
         const listContainer = document.getElementById('trending-list');
-        listContainer.innerHTML = '<div class="loading">📡 오늘의 최신 깃허브 데이터를 가져오는 중...</div>';
+        listContainer.innerHTML = '<div class="loading">📡 최신 깃허브 데이터를 가져오는 중...</div>';
         try {
-            const date = new Date(); date.setDate(date.getDate() - 1);
+            const date = new Date(); date.setDate(date.getDate() - searchPeriod); // 💡 [수정됨] 설정된 기간 반영
             const sinceDate = date.toISOString().split('T')[0];
             const ghRes = await fetch(`https://api.github.com/search/repositories?q=created:>${sinceDate}&sort=stars&order=desc`);
             const ghData = await ghRes.json();
             const rawRepos = ghData.items.slice(0, 20).map(r => ({ name: r.full_name, desc: r.description, url: r.html_url, stars: r.stargazers_count, lang: r.language }));
             listContainer.innerHTML = '<div class="loading" style="color:var(--ai-color);">✨ AI가 분석 중입니다...</div>';
-            const prompt = `시니어 기술 분석가로서 오늘 생성된 20개 저장소를 분석해. 1개도 누락하지 마. 모든 카테고리명, 설명(desc), 분석(analysis), 적용 예시(useCase)는 반드시 매끄러운 '한국어'로 번역하고 작성해. 반드시 JSON 형식으로 응답해: { "categories": [ { "categoryName": "", "repos": [{"name":"", "desc":"", "analysis":"", "useCase":"", "url":"", "stars":0, "lang":""}] } ] } 데이터: ${JSON.stringify(rawRepos)}`;
+            const prompt = `시니어 기술 분석가로서 생성된 20개 저장소를 분석해. 1개도 누락하지 마. 모든 카테고리명, 설명(desc), 분석(analysis), 적용 예시(useCase)는 반드시 매끄러운 '한국어'로 번역하고 작성해. 반드시 JSON 형식으로 응답해: { "categories": [ { "categoryName": "", "repos": [{"name":"", "desc":"", "analysis":"", "useCase":"", "url":"", "stars":0, "lang":""}] } ] } 데이터: ${JSON.stringify(rawRepos)}`;
             const aiRes = await fetch('https://api.openai.com/v1/chat/completions', {
                 method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
                 body: JSON.stringify({ model: "gpt-4o-mini", response_format: { type: "json_object" }, messages: [{ role: "user", content: prompt }], temperature: 0.3 })
@@ -503,7 +501,7 @@
         const listContainer = document.getElementById('biz-list');
         listContainer.innerHTML = '<div class="loading">📡 기술/뉴스 교차 분석 중...</div>';
         try {
-            const date = new Date(); date.setDate(date.getDate() - 1);
+            const date = new Date(); date.setDate(date.getDate() - searchPeriod); // 💡 [수정됨] 설정된 기간 반영
             const sinceDate = date.toISOString().split('T')[0];
             const ghRes = await fetch(`https://api.github.com/search/repositories?q=created:>${sinceDate}&sort=stars&order=desc`);
             const ghData = await ghRes.json();
@@ -512,7 +510,7 @@
             const topIds = await hnRes.json();
             const stories = await Promise.all(topIds.slice(0, 15).map(id => fetch(`https://hacker-news.firebaseio.com/v0/item/${id}.json`).then(r => r.json())));
             const news = stories.map(s => s.title);
-            const prompt = `오늘의 GitHub 트렌드와 IT 뉴스를 결합해 한국어로 사업 아이템 3개를 기획해. 구체적인 기술 스택(techStack)과 관련된 실제 오픈소스 GitHub 링크(githubLinks)를 2개씩 찾아줘. 반드시 JSON 형식으로 응답해: { "insights": [{"title":"", "context":"", "idea":"", "target":"", "techStack":"", "githubLinks":[{"name":"", "url":""}]}] } 데이터: ${JSON.stringify({gh: rawRepos, news: news})}`;
+            const prompt = `GitHub 트렌드와 IT 뉴스를 결합해 한국어로 사업 아이템 3개를 기획해. 구체적인 기술 스택(techStack)과 관련된 실제 오픈소스 GitHub 링크(githubLinks)를 2개씩 찾아줘. 반드시 JSON 형식으로 응답해: { "insights": [{"title":"", "context":"", "idea":"", "target":"", "techStack":"", "githubLinks":[{"name":"", "url":""}]}] } 데이터: ${JSON.stringify({gh: rawRepos, news: news})}`;
             
             const aiRes = await fetch('https://api.openai.com/v1/chat/completions', {
                 method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
@@ -520,10 +518,9 @@
             });
             const aiData = await aiRes.json();
             currentInsights = JSON.parse(aiData.choices[0].message.content).insights;
-            listContainer.innerHTML = `<h1 style="text-align:center; color:#0052cc;">Daily Business Insight Report</h1><hr style="border:1px solid #eee; margin-bottom:30px;">`;
+            listContainer.innerHTML = `<h1 style="text-align:center; color:#0052cc;">Business Insight Report</h1><hr style="border:1px solid #eee; margin-bottom:30px;">`;
             currentInsights.forEach((item, idx) => {
                 let linksHtml = item.githubLinks && item.githubLinks.length > 0 ? item.githubLinks.map(l => `<a href="${l.url}" target="_blank" class="github-link-tag">🔗 ${l.name}</a>`).join(' ') : '<span style="color:gray; font-size:0.9em;">링크 데이터 없음</span>';
-                // 💡 [변경됨] onclick에 window.saveToCloud 연결
                 listContainer.innerHTML += `
                     <div class="repo-card">
                         <button class="btn-save-item" onclick="window.saveToCloud('biz', ${idx})">⭐ ☁️ 클라우드에 저장</button>
@@ -558,7 +555,6 @@
             currentFeasibilities.forEach((report, idx) => {
                 let scoreColor = report.score >= 70 ? '#2ecc71' : (report.score >= 40 ? '#f39c12' : '#e74c3c');
                 
-                // 💡 [변경됨] 70점 이상일 경우 클라우드 자동 저장 호출
                 if (report.score >= 70) {
                     if (window.currentUser) {
                         window.saveToCloud('feas', idx, true);
