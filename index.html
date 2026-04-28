@@ -12,7 +12,6 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
         import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
-        // 💡 [수정됨] 상세 기획을 문서에 추가하기 위해 'updateDoc' 함수를 가져옵니다.
         import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc, query, orderBy, where, updateDoc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
 
         // 파이어베이스 설정 코드
@@ -111,7 +110,6 @@
             } catch (e) { console.error("Error adding document: ", e); }
         };
 
-        // 💡 [추가됨] AI가 생성한 객체 텍스트를 깔끔하게 변환하는 함수 (저장소와 상세기획에서 공통 사용)
         window.formatAIText = (data) => {
             if (!data) return "내용 없음";
             if (typeof data === 'string') return data.replace(/\n/g, '<br>');
@@ -192,11 +190,15 @@
                             </div>`;
                     }
 
-                    // 💡 [추가됨] 클라우드에 상세 기획이 저장되어 있다면, 저장소 카드 밑에 함께 그려줍니다.
+                    // 💡 [수정됨] 토글 기능과 삭제 기능이 포함된 UI로 업데이트 되었습니다.
                     let detailHtml = '';
                     if (item.detailPlan) {
                         detailHtml = `
-                            <div class="ai-insight-box" style="background:#ebf5fb; border-color:#d6eaf8; margin-top: 15px; border-top: 3px solid #3498db;">
+                            <div style="margin-top: 15px; text-align: right;">
+                                <button onclick="window.toggleDetailPlan('detail-${docId}', this)" style="background: #fff; color: #3498db; border: 1px solid #3498db; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 0.8em; font-weight: bold; margin-right: 5px; transition: 0.2s;">🔽 상세 기획 숨기기</button>
+                                <button onclick="window.deleteDetailPlanFromCloud('${docId}')" style="background: #fff; color: #e74c3c; border: 1px solid #e74c3c; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 0.8em; font-weight: bold; transition: 0.2s;">🗑️ 기획안 삭제</button>
+                            </div>
+                            <div id="detail-${docId}" class="ai-insight-box" style="background:#ebf5fb; border-color:#d6eaf8; margin-top: 10px; border-top: 3px solid #3498db;">
                                 <h4 style="color:#2980b9; margin-top:0; margin-bottom:15px;">🚀 저장된 상세 기획 및 구현 가이드</h4>
                                 <div class="insight-content"><span class="insight-title" style="color:#2980b9;">🏗️ 아키텍처 및 DB 설계</span>${window.formatAIText(item.detailPlan.architecture)}</div>
                                 <div class="insight-content"><span class="insight-title" style="color:#2980b9;">🔑 핵심 기능 (MVP)</span>${window.formatAIText(item.detailPlan.coreFeatures)}</div>
@@ -230,7 +232,33 @@
             } catch(e) { alert("삭제 실패: " + e.message); }
         };
 
-        // 💡 [추가됨] 생성된 상세 기획을 현재 아이디어 문서(docId)에 추가(update)하여 저장하는 함수
+        // 💡 [추가됨] 상세 기획 숨기기/보기를 제어하는 토글 함수
+        window.toggleDetailPlan = (elementId, btnElement) => {
+            const el = document.getElementById(elementId);
+            if (el.style.display === 'none') {
+                el.style.display = 'block';
+                btnElement.innerText = '🔽 상세 기획 숨기기';
+            } else {
+                el.style.display = 'none';
+                btnElement.innerText = '▶️ 상세 기획 보기';
+            }
+        };
+
+        // 💡 [추가됨] 클라우드에 저장된 상세 기획 데이터'만' 삭제하는 함수
+        window.deleteDetailPlanFromCloud = async (docId) => {
+            if(!confirm("저장된 '상세 기획'을 삭제하시겠습니까? (기본 아이디어는 유지됩니다)")) return;
+            try {
+                // deleteField를 동적으로 가져와서 해당 필드만 깔끔하게 제거합니다.
+                const { doc, updateDoc, deleteField } = await import("https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js");
+                const docRef = doc(db, "ideas", docId);
+                await updateDoc(docRef, { detailPlan: deleteField() });
+                alert("상세 기획이 삭제되었습니다.");
+                renderVaultFromCloud(); // 화면 새로고침
+            } catch(e) { 
+                alert("기획안 삭제 실패: " + e.message); 
+            }
+        };
+
         window.saveDetailPlanToCloud = async () => {
             if (!window.currentDetailDocId || !window.currentDetailPlan) return;
             try {
@@ -277,13 +305,11 @@
 
                 const detail = JSON.parse(aiData.choices[0].message.content);
 
-                // 💡 [수정됨] 나중에 저장할 수 있도록 현재 생성된 데이터와 문서 ID를 전역 변수에 임시 보관
                 window.currentDetailDocId = docId;
                 window.currentDetailPlan = detail;
 
                 container.innerHTML = `
                     <div class="repo-card" style="border-top: 5px solid #3498db;">
-                        <!-- 💡 [추가됨] 기획안 저장 버튼 삽입 -->
                         <button class="btn-save-item" onclick="window.saveDetailPlanToCloud()" style="border-color:#3498db; color:#3498db; margin-top: -5px;">⭐ 기획안 저장</button>
                         <h3 style="color:#3498db; cursor:default; text-decoration:none;">🚀 ${item.title} - 기획 및 구현 가이드</h3>
                         
